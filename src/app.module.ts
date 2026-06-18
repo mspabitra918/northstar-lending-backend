@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { SequelizeModule } from '@nestjs/sequelize';
+import * as pg from 'pg';
 
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -28,6 +29,7 @@ import { UploadModule } from './common/upload/upload.module';
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
         dialect: 'postgres',
+        dialectModule: pg,
 
         host: configService.get<string>('DB_HOST'),
         port: Number(configService.get<string>('DB_PORT')),
