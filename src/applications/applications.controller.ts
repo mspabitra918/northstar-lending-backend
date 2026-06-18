@@ -12,12 +12,12 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { RolesGuard } from 'src/common/guards/roles.guard';
-import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
-import { Roles } from 'src/common/decorators/roles.decorator';
-import { CurrentUser } from 'src/common/decorators/current-user.decorator';
-import { UserRole } from 'src/common/enums/user-role.enum';
-import type { AuthenticatedUser } from 'src/auth/strategies/jwt.strategy';
+import { RolesGuard } from '../common/guards/roles.guard';
+import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { Roles } from '../common/decorators/roles.decorator';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { UserRole } from '../common/enums/user-role.enum';
+import type { AuthenticatedUser } from '../auth/strategies/jwt.strategy';
 import { LoanApplicationService } from './applications.service';
 import { CreateLoanApplicationDto } from './dto/create-application.dto';
 import { UpdateLoanStatusDto } from './dto/update-loan-status.dto';

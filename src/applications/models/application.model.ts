@@ -1,11 +1,11 @@
 // applications/models/application.model.ts
 
 import { Table, Column, Model, DataType, HasMany } from 'sequelize-typescript';
-import { AdminNote } from 'src/admin-notes/models/admin-note.model';
-import { AuditLog } from 'src/audit-logs/models/audit-log.model';
-import { BankConnection } from 'src/bank-connections/models/bank-connection.model';
-import { ApplicationStatus } from 'src/common/enums/application-status.enum';
-import { Document } from 'src/documents/models/document.model';
+import { AdminNote } from '../../admin-notes/models/admin-note.model';
+import { AuditLog } from '../../audit-logs/models/audit-log.model';
+import { BankConnection } from '../../bank-connections/models/bank-connection.model';
+import { ApplicationStatus } from '../../common/enums/application-status.enum';
+import { Document } from '../../documents/models/document.model';
 
 @Table({
   tableName: 'applications',

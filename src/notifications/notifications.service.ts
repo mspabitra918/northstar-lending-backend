@@ -2,8 +2,8 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Mailgun from 'mailgun.js';
 import FormData from 'form-data';
-import { LoanApplication } from 'src/applications/models/application.model';
-import { ApplicationStatus } from 'src/common/enums/application-status.enum';
+import { LoanApplication } from '../applications/models/application.model';
+import { ApplicationStatus } from '../common/enums/application-status.enum';
 
 export interface EmailPayload {
   to: string;

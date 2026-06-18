@@ -4,12 +4,12 @@ import { ConfigService } from '@nestjs/config';
 // require() that bundlers/serverless tracers (Vercel) can't follow, so we
 // import it here and pass it through `dialectModule` below.
 import * as pg from 'pg';
-import { User } from 'src/users/models/user.model';
-import { LoanApplication } from 'src/applications/models/application.model';
-import { BankConnection } from 'src/bank-connections/models/bank-connection.model';
-import { AdminNote } from 'src/admin-notes/models/admin-note.model';
-import { AuditLog } from 'src/audit-logs/models/audit-log.model';
-import { Document } from 'src/documents/models/document.model';
+import { User } from '../src/users/models/user.model';
+import { LoanApplication } from '../src/applications/models/application.model';
+import { BankConnection } from '../src/bank-connections/models/bank-connection.model';
+import { AdminNote } from '../src/admin-notes/models/admin-note.model';
+import { AuditLog } from '../src/audit-logs/models/audit-log.model';
+import { Document } from '../src/documents/models/document.model';
 
 /**
  * Builds the Sequelize connection options for the NestJS runtime.

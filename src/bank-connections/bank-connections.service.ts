@@ -11,7 +11,7 @@ import { PlaidService } from '../plaid/plaid.service';
 import { LoanApplication } from '../applications/models/application.model';
 import { BankConnection } from './models/bank-connection.model';
 import { CreateBankConnectionDto } from './dto/create-bank-connection.dto';
-import { DripCampaignService } from 'src/drip-campaign/drip-campaign.service';
+import { DripCampaignService } from '../drip-campaign/drip-campaign.service';
 
 @Injectable()
 export class BankConnectionsService {

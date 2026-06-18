@@ -5,10 +5,10 @@ import {
 } from '@nestjs/common';
 import { Document } from './models/document.model';
 import { InjectModel } from '@nestjs/sequelize';
-import { LoanApplication } from 'src/applications/models/application.model';
+import { LoanApplication } from '../applications/models/application.model';
 import { CreateDocumentDto } from './dto/create-document.dto';
-import { UploadService } from 'src/common/upload/upload.service';
-import { AuditLogsService } from 'src/audit-logs/audit-logs.service';
+import { UploadService } from '../common/upload/upload.service';
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
 
 @Injectable()
 export class DocumentsService {

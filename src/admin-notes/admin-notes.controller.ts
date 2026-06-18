@@ -8,10 +8,10 @@ import {
   InternalServerErrorException,
   UseGuards,
 } from '@nestjs/common';
-import { RolesGuard } from 'src/common/guards/roles.guard';
+import { RolesGuard } from '../common/guards/roles.guard';
 import { AdminNotesService } from './admin-notes.service';
 import { CreateAdminNoteDto } from './dto/create-admin-note.dto';
-import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
+import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 
 @Controller('admin-notes')
 export class AdminNotesController {

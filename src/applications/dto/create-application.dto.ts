@@ -1,7 +1,7 @@
 // applications/dto/create-application.dto.ts
 
 import { IsEmail, IsNumber, IsString, IsBoolean } from 'class-validator';
-import { ApplicationStatus } from 'src/common/enums/application-status.enum';
+import { ApplicationStatus } from '../../common/enums/application-status.enum';
 
 export class CreateLoanApplicationDto {
   //   @IsString()

@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/sequelize';
 import { AdminNote } from './models/admin-note.model';
 import { CreateAdminNoteDto } from './dto/create-admin-note.dto';
-import { AuditLogsService } from 'src/audit-logs/audit-logs.service';
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
 
 interface NoteContext {
   ip_address?: string | null;

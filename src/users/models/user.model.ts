@@ -1,8 +1,8 @@
 // users/models/user.model.ts
 
 import { Table, Column, Model, DataType, HasMany } from 'sequelize-typescript';
-import { AdminNote } from 'src/admin-notes/models/admin-note.model';
-import { AuditLog } from 'src/audit-logs/models/audit-log.model';
+import { AdminNote } from '../../admin-notes/models/admin-note.model';
+import { AuditLog } from '../../audit-logs/models/audit-log.model';
 import { UserRole } from '../../common/enums/user-role.enum';
 
 @Table({

@@ -6,7 +6,7 @@ import { BankConnectionsService } from './bank-connections.service';
 import { BankConnection } from './models/bank-connection.model';
 import { PlaidModule } from '../plaid/plaid.module';
 import { LoanApplicationModule } from '../applications/applications.module';
-import { DripCampaignModule } from 'src/drip-campaign/drip-campaign.module';
+import { DripCampaignModule } from '../drip-campaign/drip-campaign.module';
 
 @Module({
   imports: [

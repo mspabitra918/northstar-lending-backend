@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import PDFDocument from 'pdfkit';
-import { UploadService } from 'src/common/upload/upload.service';
+import { UploadService } from '../common/upload/upload.service';
 import { LoanApplication } from './models/application.model';
 
 // Fixed APR from the product brief (see frontend src/lib/constants.ts LOAN.apr).

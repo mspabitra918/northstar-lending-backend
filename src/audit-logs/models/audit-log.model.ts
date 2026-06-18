@@ -12,8 +12,8 @@ import {
   BeforeDestroy,
   BeforeBulkDestroy,
 } from 'sequelize-typescript';
-import { LoanApplication } from 'src/applications/models/application.model';
-import { User } from 'src/users/models/user.model';
+import { LoanApplication } from '../../applications/models/application.model';
+import { User } from '../../users/models/user.model';
 
 @Table({
   tableName: 'audit_logs',

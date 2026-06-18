@@ -8,7 +8,7 @@ import {
 import { InjectModel } from '@nestjs/sequelize';
 import * as bcrypt from 'bcryptjs';
 import { User } from './models/user.model';
-import { UserRole } from 'src/common/enums/user-role.enum';
+import { UserRole } from '../common/enums/user-role.enum';
 
 export interface CreateUserInput {
   first_name: string;
