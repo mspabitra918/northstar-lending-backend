@@ -3,7 +3,7 @@
 import { Table, Column, Model, DataType, HasMany } from 'sequelize-typescript';
 import { AdminNote } from 'src/admin-notes/models/admin-note.model';
 import { AuditLog } from 'src/audit-logs/models/audit-log.model';
-import { UserRole } from 'src/common/enums/user-role.enum';
+import { UserRole } from '../../common/enums/user-role.enum';
 
 @Table({
   tableName: 'users',
