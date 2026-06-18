@@ -1,7 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { IncomingMessage, ServerResponse } from 'http';
-import { AppModule } from 'src/app.module';
-import { setupApp } from 'src/setup';
+import { AppModule } from '../dist/src/app.module';
+import { setupApp } from '../dist/src/setup';
 
 let cachedServer: any;
 
