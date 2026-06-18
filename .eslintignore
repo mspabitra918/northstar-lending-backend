@@ -1,0 +1,6 @@
+{
+  files: ["migrations/**/*.js"],
+  rules: {
+    "@typescript-eslint/no-unsafe-assignment": "off",
+  },
+}
