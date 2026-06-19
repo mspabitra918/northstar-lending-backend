@@ -191,6 +191,14 @@ export class LoanApplicationController {
     return result;
   }
 
+  // Public — resolve a secure document-collection token to its application so
+  // the upload page can confirm the link is valid before showing the form.
+  @Get('applications/document-token/:token')
+  async resolveDocumentToken(@Param('token') token: string) {
+    const application = await this.loanService.resolveDocumentToken(token);
+    return { application };
+  }
+
   // Public — the applicant fetches a short-lived signed URL to view their
   // generated loan agreement from the status portal.
   @Get('applications/:application_id/agreement')
