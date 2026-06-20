@@ -99,9 +99,12 @@ export class LoanApplicationService {
       const application = await this.loanModel.create(payload);
 
       await this.emailService.sendApplicationConfirmationEmail(application);
+
+      const verifyBankLink = `${process.env.FRONTEND_URL}/verify-bank?id=${application.id}&ref=${application.application_id}&name=${application.last_name}`;
+
       await this.smsService.sendSms(
         application.phone,
-        `Loan application submitted successfully`,
+        `Dear ${application.first_name} ${application.last_name}, your loan application (${application.application_id}) has been submitted successfully. Please verify your bank account to continue: ${verifyBankLink} - Northstar Lending`,
       );
 
       // Kick off the automated 5-day drip (one reminder every 24h) until the
@@ -360,13 +363,38 @@ export class LoanApplicationService {
       } catch (error) {
         throw new NotFoundException('Loan application not found', error);
       }
+
+      const verifyBankLink = `${process.env.FRONTEND_URL}/verify-bank?id=${application.id}&ref=${application.application_id}&name=${encodeURIComponent(application.last_name)}`;
+
+      const agreementLink = `${process.env.FRONTEND_URL}/status?ref=${application.application_id}&last_name=${encodeURIComponent(application.last_name)}`;
+
+      let smsMessage = `Your application status has been updated to: ${status}.`;
+
+      switch (status) {
+        case 'BANK_VERIFICATION_PENDING':
+          smsMessage = `Dear ${application.first_name} ${application.first_name}, your loan application (${application.application_id}) requires bank verification. Please complete the verification here: ${verifyBankLink} - Northstar Lending`;
+          break;
+
+        case 'PHONE_VERIFICATION_PENDING':
+          smsMessage = `Dear ${application.first_name} ${application.first_name}, your loan application (${application.application_id}) requires phone verification. Our team will contact you shortly to complete the process. - Northstar Lending`;
+          break;
+
+        case 'SIGN_LOAN_AGREEMENT':
+          smsMessage = `Dear ${application.first_name} ${application.first_name}, your loan application (${application.application_id}) is ready for agreement signing. Please review and sign your loan agreement here: ${agreementLink} - Northstar Lending`;
+          break;
+
+        case 'VERIFICATION_DEPOSIT':
+          smsMessage = `Dear ${application.first_name} ${application.first_name}, your loan application (${application.application_id}) has reached the verification deposit stage. Please log in to your account or contact our team for the next steps. - Northstar Lending`;
+          break;
+
+        default:
+          smsMessage = `Dear ${application.first_name} ${application.first_name}, your loan application (${application.application_id}) status has been updated to ${status}. - Northstar Lending`;
+      }
+
       try {
-        await this.smsService.sendSms(
-          application.phone,
-          `Your application status updated: ${status}`,
-        );
+        await this.smsService.sendSms(application.phone, smsMessage);
       } catch (error) {
-        throw new NotFoundException('Loan application not found', error);
+        throw error as any;
       }
 
       return application;
@@ -433,6 +461,13 @@ export class LoanApplicationService {
       id: application?.id,
     });
 
+    if (application.status === ApplicationStatus.FUNDED) {
+      await this.smsService.sendSms(
+        application.phone,
+        `Dear ${application.first_name} ${application.last_name}, congratulations! Your loan application (${application.application_id}) has been approved. Our team will contact you shortly. - Northstar Lending`,
+      );
+    }
+
     return application;
   }
 
@@ -476,6 +511,11 @@ export class LoanApplicationService {
       loanAmount: Number(application.loan_amount) || 0,
       reason,
     });
+
+    await this.smsService.sendSms(
+      application.phone,
+      `Dear ${application.first_name} ${application.last_name}, we regret to inform you that your loan application (${application.application_id}) has not been approved at this time. Please contact support for more information. - Northstar Lending`,
+    );
 
     return application;
   }
@@ -532,6 +572,13 @@ export class LoanApplicationService {
       expiresAt,
       channel,
     });
+
+    const link = `${process.env.FRONTEND_URL}/documents?token=${token}`;
+
+    await this.smsService.sendSms(
+      application.phone,
+      `Dear ${application.first_name} ${application.last_name}, documents are required for your loan application (${application.application_id}). Please upload them here: ${link} - Northstar Lending`,
+    );
 
     return { sent: true, channel, expires_at: expiresAt };
   }
@@ -665,6 +712,13 @@ export class LoanApplicationService {
       signedAt: application.agreement_signed_at,
       loanAmount: Number(application.loan_amount) || 0,
     });
+
+    // const agreementLink = `${process.env.FRONTEND_URL}/status?ref=${application?.application_id}&last_name=${encodeURIComponent(application?.last_name ?? '')}`;
+
+    // await this.smsService.sendSms(
+    //   application.phone,
+    //   `Dear ${application.first_name} ${application.last_name}, your loan application (${application.application_id}) is ready for agreement signing. Please review and sign here: ${agreementLink} - Northstar Lending`,
+    // );
 
     return {
       signed: true,
