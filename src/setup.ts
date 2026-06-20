@@ -33,6 +33,7 @@ export function setupApp(app: INestApplication) {
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
-  // Resolves to /api/docs because of the global prefix set above.
-  SwaggerModule.setup('docs', app, document);
+  // useGlobalPrefix makes Swagger honor setGlobalPrefix('api') above; without it
+  // Swagger ignores the prefix and would serve at /docs. Result: /api/docs.
+  SwaggerModule.setup('docs', app, document, { useGlobalPrefix: true });
 }
