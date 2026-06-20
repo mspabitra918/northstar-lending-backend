@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { randomBytes } from 'crypto';
-import { Includeable, Op, cast, col, where as whereFn } from 'sequelize';
+import { Op, cast, col, fn, where as whereFn } from 'sequelize';
 import { InjectModel } from '@nestjs/sequelize';
 import { decrypt, encrypt } from '../common/encryption.util';
 // import { EmailService } from '../email/email.service';
@@ -244,6 +244,9 @@ export class LoanApplicationService {
           { email: { [Op.iLike]: like } },
           { phone: { [Op.iLike]: like } },
           { application_id: { [Op.iLike]: like } },
+          whereFn(fn('concat', col('first_name'), ' ', col('last_name')), {
+            [Op.iLike]: like,
+          }),
           whereFn(cast(col('account_type'), 'text'), {
             [Op.iLike]: like,
           }),
