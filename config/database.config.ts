@@ -21,9 +21,27 @@ export const buildSequelizeOptions = (
 ): SequelizeModuleOptions => {
   const databaseUrl = config.get<string>('DATABASE_URL');
 
-  // Cloud Postgres providers (Neon, Supabase, RDS, …) require SSL. Enabled
-  // automatically when a DATABASE_URL is used, or explicitly via DB_SSL=true.
-  const useSsl = !!databaseUrl || config.get<string>('DB_SSL') === 'true';
+  // Local Postgres typically isn't built with SSL, so forcing it on breaks the
+  // connection ("server does not support SSL connections"). Cloud providers
+  // (Neon, Supabase, RDS, …) do require it. Decide based on actual signals:
+  // an explicit DB_SSL=true, an sslmode=require in the URL, or a non-local host.
+  const isLocalHost = (host?: string) =>
+    !host || host === 'localhost' || host === '127.0.0.1' || host === '::1';
+
+  let urlWantsSsl = false;
+  if (databaseUrl) {
+    try {
+      const parsed = new URL(databaseUrl);
+      const sslMode = parsed.searchParams.get('sslmode');
+      urlWantsSsl =
+        (sslMode != null && sslMode !== 'disable') ||
+        !isLocalHost(parsed.hostname);
+    } catch {
+      // Malformed URL — fall back to explicit DB_SSL only.
+    }
+  }
+
+  const useSsl = config.get<string>('DB_SSL') === 'true' || urlWantsSsl;
   const dialectOptions = useSsl
     ? { ssl: { require: true, rejectUnauthorized: false } }
     : undefined;
