@@ -25,7 +25,9 @@ import { DeclineApplicationDto } from './dto/decline-application.dto';
 import { CollectDocumentsDto } from './dto/collect-documents.dto';
 import { SignAgreementDto } from './dto/sign-agreement.dto';
 
-const BACKEND_PUCLIC_URL = '/api/loans';
+// Route prefix WITHOUT a leading '/api' — the global prefix (set in setup.ts)
+// already adds it, so the final path is /api/loans/*.
+const BACKEND_PUCLIC_URL = 'loans';
 
 @Controller(BACKEND_PUCLIC_URL)
 export class LoanApplicationController {
