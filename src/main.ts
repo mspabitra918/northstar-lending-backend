@@ -15,7 +15,10 @@ async function createApp() {
   app.enableCors({
     origin: process.env.FRONTEND_ORIGIN
       ? process.env.FRONTEND_ORIGIN.split(',').map((o) => o.trim())
-      : ['http://localhost:3000'],
+      : [
+          'http://localhost:3000',
+          'https://northstar-lending-frontend.vercel.app',
+        ],
     credentials: true,
   });
 
