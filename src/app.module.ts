@@ -18,6 +18,7 @@ import { DripCampaignModule } from './drip-campaign/drip-campaign.module';
 import { BankConnectionsModule } from './bank-connections/bank-connections.module';
 import { AdminNotesModule } from './admin-notes/admin-notes.module';
 import { UploadModule } from './common/upload/upload.module';
+import { ContactsModule } from './contacts/contacts.module';
 
 @Module({
   imports: [
@@ -43,6 +44,7 @@ import { UploadModule } from './common/upload/upload.module';
     DripCampaignModule,
     BankConnectionsModule,
     AdminNotesModule,
+    ContactsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
