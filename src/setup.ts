@@ -13,7 +13,8 @@ export function setupApp(app: INestApplication) {
       ? process.env.FRONTEND_ORIGIN.split(',').map((o) => o.trim())
       : [
           'http://localhost:3000',
-          'https://northstar-lending-frontend.vercel.app',
+          'https://northstarlend.com',
+          'https://www.northstarlend.com',
         ],
     credentials: true,
   });
