@@ -8,7 +8,12 @@ import { setupApp } from './setup';
 // serverless handler (Vercel) and the standalone listener (local / Node hosts).
 async function createApp() {
   const app = await NestFactory.create(AppModule);
+
+  const expressApp = app.getHttpAdapter().getInstance();
+  expressApp.set('trust proxy', true);
+
   setupApp(app);
+
   return app;
 }
 

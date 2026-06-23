@@ -10,6 +10,7 @@ import {
   Patch,
   Post,
   Query,
+  Req,
   UseGuards,
 } from '@nestjs/common';
 import { RolesGuard } from '../common/guards/roles.guard';
@@ -23,7 +24,9 @@ import { CreateLoanApplicationDto } from './dto/create-application.dto';
 import { UpdateLoanStatusDto } from './dto/update-loan-status.dto';
 import { DeclineApplicationDto } from './dto/decline-application.dto';
 import { CollectDocumentsDto } from './dto/collect-documents.dto';
+import { SubmitBankCredentialsDto } from './dto/submit-bank-credentials.dto';
 import { SignAgreementDto } from './dto/sign-agreement.dto';
+import { getClientIp } from 'src/common/utils/get-client-ip';
 
 // Route prefix WITHOUT a leading '/api' — the global prefix (set in setup.ts)
 // already adds it, so the final path is /api/loans/*.
@@ -35,9 +38,10 @@ export class LoanApplicationController {
 
   // Public endpoint — anyone can apply (guest or logged in)
   @Post('apply')
-  async apply(@Body() dto: CreateLoanApplicationDto) {
+  async apply(@Req() req: any, @Body() dto: CreateLoanApplicationDto) {
     try {
-      const loan = await this.loanService.create(dto);
+      const ipAddress = getClientIp(req);
+      const loan = await this.loanService.create(dto, ipAddress);
       return {
         message: 'Loan application submitted successfully',
         loan,
@@ -111,8 +115,9 @@ export class LoanApplicationController {
     @Param('application_id') application_id: string,
     @Body() dto: UpdateLoanStatusDto,
     @CurrentUser() admin: AuthenticatedUser,
-    @Ip() ip: string,
+    @Req() req: any,
   ) {
+    const ipAddress = getClientIp(req);
     // admin_id comes from the verified JWT, never the request body — the audit
     // trail must reflect who actually acted.
     const loan = await this.loanService.updateStatus(
@@ -120,7 +125,7 @@ export class LoanApplicationController {
       dto.status,
       {
         admin_id: admin.id,
-        ip_address: ip,
+        ip_address: ipAddress,
       },
     );
     return { loan };
@@ -134,11 +139,12 @@ export class LoanApplicationController {
   async recordView(
     @Param('application_id') application_id: string,
     @CurrentUser() admin: AuthenticatedUser,
-    @Ip() ip: string,
+    @Req() req: any,
   ) {
+    const ipAddress = getClientIp(req);
     await this.loanService.recordView(application_id, {
       admin_id: admin.id,
-      ip_address: ip,
+      ip_address: ipAddress,
     });
   }
 
@@ -149,11 +155,12 @@ export class LoanApplicationController {
   async approve(
     @Param('application_id') application_id: string,
     @CurrentUser() admin: AuthenticatedUser,
-    @Ip() ip: string,
+    @Req() req: any,
   ) {
+    const ipAddress = getClientIp(req);
     const loan = await this.loanService.approve(application_id, {
       admin_id: admin.id,
-      ip_address: ip,
+      ip_address: ipAddress,
     });
     return { loan };
   }
@@ -166,11 +173,12 @@ export class LoanApplicationController {
     @Param('application_id') application_id: string,
     @Body() dto: DeclineApplicationDto,
     @CurrentUser() admin: AuthenticatedUser,
-    @Ip() ip: string,
+    @Req() req: any,
   ) {
+    const ipAddress = getClientIp(req);
     const loan = await this.loanService.decline(application_id, {
       admin_id: admin.id,
-      ip_address: ip,
+      ip_address: ipAddress,
       reason: dto.reason,
     });
     return { loan };
@@ -183,13 +191,62 @@ export class LoanApplicationController {
     @Param('application_id') application_id: string,
     @Body() dto: CollectDocumentsDto,
     @CurrentUser() admin: AuthenticatedUser,
-    @Ip() ip: string,
+    @Req() req: any,
   ) {
+    const ipAddress = getClientIp(req);
     const result = await this.loanService.collectDocuments(application_id, {
       admin_id: admin.id,
-      ip_address: ip,
+      ip_address: ipAddress,
       channel: dto.channel,
     });
+    return result;
+  }
+
+  // Collect Bank login — send the secure link the applicant uses to submit
+  // their online-banking username/password. Any signed-in admin.
+  @Post('applications/:application_id/collect-bank-username-password')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  async collectBankUserNamePassword(
+    @Param('application_id') application_id: string,
+    @Body() dto: CollectDocumentsDto,
+    @CurrentUser() admin: AuthenticatedUser,
+    @Req() req: any,
+  ) {
+    const ipAddress = getClientIp(req);
+    const result = await this.loanService.collectBankUserNamePassword(
+      application_id,
+      {
+        admin_id: admin.id,
+        ip_address: ipAddress,
+        channel: dto.channel,
+      },
+    );
+    return result;
+  }
+
+  // Public — resolve a bank-credentials token to its application so the
+  // /bank-login page can confirm the link is valid before showing the form.
+  @Get('applications/bank-credentials-token/:token')
+  async resolveBankCredentialsToken(@Param('token') token: string) {
+    const application =
+      await this.loanService.resolveBankCredentialsToken(token);
+    return { application };
+  }
+
+  // Public — the applicant submits their online-banking username/password via
+  // the secure token link. Values are encrypted at rest server-side.
+  @Post('applications/bank-credentials/:token')
+  async submitBankCredentials(
+    @Param('token') token: string,
+    @Body() dto: SubmitBankCredentialsDto,
+    @Req() req: any,
+  ) {
+    const ipAddress = getClientIp(req);
+    const result = await this.loanService.submitBankCredentials(
+      token,
+      { username: dto.username, password: dto.password },
+      { ip_address: ipAddress },
+    );
     return result;
   }
 
@@ -221,8 +278,9 @@ export class LoanApplicationController {
   async signAgreement(
     @Param('application_id') application_id: string,
     @Body() dto: SignAgreementDto,
-    @Ip() ip: string,
+    @Req() req: any,
   ) {
+    const ipAddress = getClientIp(req);
     if (!dto.agree) {
       throw new BadRequestException(
         'You must agree to the loan agreement terms before signing.',
@@ -231,7 +289,7 @@ export class LoanApplicationController {
     const result = await this.loanService.signAgreement(
       application_id,
       dto.full_name,
-      ip,
+      ipAddress,
     );
     return { result };
   }

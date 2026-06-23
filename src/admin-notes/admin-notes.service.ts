@@ -4,9 +4,9 @@ import { AdminNote } from './models/admin-note.model';
 import { CreateAdminNoteDto } from './dto/create-admin-note.dto';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
 
-interface NoteContext {
-  ip_address?: string | null;
-}
+// interface NoteContext {
+//   ip_address?: string | null;
+// }
 
 @Injectable()
 export class AdminNotesService {
@@ -20,7 +20,8 @@ export class AdminNotesService {
   async create(
     application_id: string,
     dto: CreateAdminNoteDto,
-    context: NoteContext = {},
+    // context: NoteContext = {},
+    ipAddress: string,
   ): Promise<AdminNote> {
     try {
       const note: AdminNote = await this.adminNoteModel.create({
@@ -32,7 +33,7 @@ export class AdminNotesService {
       await this.auditLogsService.logAdminNoteCreated({
         admin_id: dto.admin_id,
         application_id,
-        ip_address: context.ip_address ?? null,
+        ip_address: ipAddress,
       });
 
       return note;

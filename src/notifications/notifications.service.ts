@@ -4,11 +4,22 @@ import Mailgun from 'mailgun.js';
 import FormData from 'form-data';
 import { LoanApplication } from '../applications/models/application.model';
 import { ApplicationStatus } from '../common/enums/application-status.enum';
+import {
+  formatPacificDateTime,
+  formatPacificLongDate,
+} from '../common/utils/timezone';
+
+export interface EmailAttachment {
+  filename: string;
+  data: Buffer;
+  contentType?: string;
+}
 
 export interface EmailPayload {
   to: string;
   subject: string;
   html: string;
+  attachment?: EmailAttachment[];
 }
 interface StatusUpdateDetails {
   applicationId: string;
@@ -37,7 +48,7 @@ export class EmailService {
 
   private async sendMailgunEmail(payload: EmailPayload): Promise<void> {
     try {
-      await this.mailgun.messages.create(this.domain, {
+      const message: Record<string, any> = {
         from: this.config.get<string>(
           'MAILGUN_FROM',
           'Northstar Lending <noreply@northstarlend.com>',
@@ -45,7 +56,19 @@ export class EmailService {
         to: payload.to,
         subject: payload.subject,
         html: payload.html,
-      });
+      };
+
+      // Mailgun.js takes attachments as { filename, data } objects (data may be
+      // a Buffer). Only set the field when files are actually present.
+      if (payload.attachment?.length) {
+        message.attachment = payload.attachment.map((a) => ({
+          filename: a.filename,
+          data: a.data,
+          contentType: a.contentType,
+        }));
+      }
+
+      await this.mailgun.messages.create(this.domain, message);
       this.logger.log(`Email sent to ${payload.to}: ${payload.subject}`);
     } catch (err) {
       this.logger.error(`Failed to send email to ${payload.to}`, err);
@@ -402,6 +425,97 @@ export class EmailService {
     });
   }
 
+  // ── Signed agreement copy → the borrower ─────────────────────
+  // Sent to the applicant immediately after they e-sign, with a PDF copy of
+  // their executed loan agreement attached for their records.
+  async sendSignedAgreementEmail(details: {
+    applicationId: string;
+    firstName: string;
+    email: string;
+    loanAmount: number;
+    signedName: string;
+    signedAt: Date;
+    pdf?: Buffer;
+  }): Promise<void> {
+    const {
+      applicationId,
+      firstName,
+      email,
+      loanAmount,
+      signedName,
+      signedAt,
+      pdf,
+    } = details;
+
+    const formattedAmount = new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+    }).format(loanAmount);
+
+    const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+      <div style="background: #F0FFF4; padding: 20px; border-radius: 8px 8px 0 0; text-align: center;">
+        <img src="https://www.northstarlend.com/logo-dark.png" alt="Northstar Lending" style="height: 48px; width: 270px; display: block; margin: 0 auto 8px;" onerror="this.style.display='none'" />
+      </div>
+      <div style="border: 1px solid #e5e7eb; border-top: none; padding: 30px; border-radius: 0 0 8px 8px;">
+        <div style="text-align: center; margin-bottom: 20px;">
+          <span style="font-size: 48px;">&#9989;</span>
+        </div>
+        <h2 style="color: #16a34a; margin-top: 0; text-align: center;">Your Loan Agreement Is Signed</h2>
+        <p style="color: #374151; font-size: 16px;">Hi ${firstName},</p>
+        <p style="color: #374151; font-size: 16px;">
+          Thank you for electronically signing your Northstar Lending loan
+          agreement. A PDF copy of your fully executed agreement is attached to
+          this email for your records.
+        </p>
+        <div style="background: #f3f4f6; border-radius: 8px; padding: 20px; margin: 20px 0;">
+          <table style="width: 100%; border-collapse: collapse;">
+            <tr><td style="padding: 6px 0; color: #6b7280; font-size: 14px;">Application ID</td><td style="padding: 6px 0; color: #111827; font-size: 14px; font-weight: bold; text-align: right;">${applicationId}</td></tr>
+            <tr><td style="padding: 6px 0; color: #6b7280; font-size: 14px;">Loan Amount</td><td style="padding: 6px 0; color: #111827; font-size: 14px; text-align: right;">${formattedAmount}</td></tr>
+            <tr><td style="padding: 6px 0; color: #6b7280; font-size: 14px;">Signed By</td><td style="padding: 6px 0; color: #111827; font-size: 14px; text-align: right;">${signedName}</td></tr>
+            <tr><td style="padding: 6px 0; color: #6b7280; font-size: 14px;">Signed On</td><td style="padding: 6px 0; color: #111827; font-size: 14px; text-align: right;">${formatPacificDateTime(
+              signedAt,
+            )}</td></tr>
+          </table>
+        </div>
+        <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 15px; margin: 20px 0;">
+          <p style="color: #1e3a8a; font-size: 14px; margin: 0;">
+            <strong>Next Step:</strong> Your application has advanced to the
+            <strong>Verification Deposit</strong> stage. A small micro-deposit
+            will confirm your routing details before your funds are released.
+          </p>
+        </div>
+        <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;">
+        <div style="text-align: center; padding: 10px 0;">
+          <p style="color: #374151; font-size: 14px; margin: 5px 0;">
+            <strong>Phone:</strong> <a href="tel:+17472061606" style="color: #1a56db; text-decoration: none;">(747) 208-0334</a>
+          </p>
+          <p style="color: #374151; font-size: 14px; margin: 5px 0;">
+            <strong>Website:</strong> <a href="https://www.northstarlend.com" style="color: #1a56db; text-decoration: none;">www.northstarlend.com</a>
+          </p>
+        </div>
+        <p style="color: #9ca3af; font-size: 12px; text-align: center;">
+          This is an automated email from Northstar Lending. Please do not reply to this email.
+        </p>
+      </div>
+    </div>`;
+
+    await this.sendMailgunEmail({
+      to: email,
+      subject: `Your signed loan agreement - ID: ${applicationId} | Northstar Lending`,
+      html,
+      attachment: pdf
+        ? [
+            {
+              filename: `Northstar-Loan-Agreement-${applicationId}.pdf`,
+              data: pdf,
+              contentType: 'application/pdf',
+            },
+          ]
+        : undefined,
+    });
+  }
+
   // ── Adverse Action Notice (Decline) ──────────────────────────
   // Sent when a manager declines an application. A declined credit decision
   // requires an adverse action notice; the optional reason is included.
@@ -510,7 +624,7 @@ export class EmailService {
             To continue processing your loan application, we need a few documents
             from you. Use the secure button below to upload them directly to your
             file — the link is unique to you and expires on
-            <strong>${expiresAt.toDateString()}</strong>.
+            <strong>${formatPacificLongDate(expiresAt)}</strong>.
           </p>
           <p style="color: #374151; font-size: 14px;">
             Application ID: <strong>${applicationId}</strong>
@@ -530,7 +644,70 @@ export class EmailService {
     if (channel === 'sms' || channel === 'both') {
       await this.sendSms(
         phone,
-        `Northstar Lending: please upload your documents for application ${applicationId} using your secure link: ${link} (expires ${expiresAt.toDateString()}). Do not share this link.`,
+        `Northstar Lending: please upload your documents for application ${applicationId} using your secure link: ${link} (expires ${formatPacificLongDate(expiresAt)}). Do not share this link.`,
+      );
+    }
+  }
+
+  // ── Collect bank credentials: secure link ────────────────────
+  // Emails (and, where configured, texts) the applicant a secure, time-limited
+  // link to submit their online-banking username and password.
+  async sendBankCredentialsLink(details: {
+    applicationId: string;
+    firstName: string;
+    email: string;
+    phone?: string | null;
+    token: string;
+    expiresAt: Date;
+    channel: 'email' | 'sms' | 'both';
+  }): Promise<void> {
+    const {
+      applicationId,
+      firstName,
+      email,
+      phone,
+      token,
+      expiresAt,
+      channel,
+    } = details;
+
+    const link = `${process.env.FRONTEND_URL}/bank-login?token=${token}`;
+
+    if (channel === 'email' || channel === 'both') {
+      const html = this.dripLayout({
+        title: 'Action Needed: Verify Your Bank Login',
+        icon: '🏦',
+        color: '#0e9f6e',
+        day: 1,
+        ctaLabel: 'Verify Bank Login Securely',
+        ctaUrl: link,
+        bodyHtml: `
+          <p style="color: #374151; font-size: 16px;">Hi ${firstName},</p>
+          <p style="color: #374151; font-size: 16px;">
+            To continue processing your loan application, please verify your bank
+            login using the secure button below. The link is unique to you and
+            expires on <strong>${formatPacificLongDate(expiresAt)}</strong>.
+          </p>
+          <p style="color: #374151; font-size: 14px;">
+            Application ID: <strong>${applicationId}</strong>
+          </p>
+          <p style="color: #9ca3af; font-size: 12px;">
+            For your security, do not share this link with anyone. We will never
+            ask for this information by phone or reply email.
+          </p>`,
+      });
+
+      await this.sendMailgunEmail({
+        to: email,
+        subject: `Action needed: verify your bank login - ID: ${applicationId} | Northstar Lending`,
+        html,
+      });
+    }
+
+    if (channel === 'sms' || channel === 'both') {
+      await this.sendSms(
+        phone,
+        `Northstar Lending: please verify your bank login for application ${applicationId} using your secure link: ${link} (expires ${formatPacificLongDate(expiresAt)}). Do not share this link.`,
       );
     }
   }

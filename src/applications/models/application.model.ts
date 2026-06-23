@@ -114,6 +114,12 @@ export class LoanApplication extends Model<LoanApplication> {
   })
   declare consent_accepted: boolean;
 
+  // Origin IP captured server-side at form submission (from x-forwarded-for /
+  // x-real-ip, falling back to the socket address). VARCHAR(45) holds both
+  // IPv4 and IPv6. Used for fraud detection and audit logging.
+  @Column({ type: DataType.STRING(45), allowNull: true })
+  declare ip_address: string | null;
+
   // ── Loan agreement (SIGN_LOAN_AGREEMENT step) ────────────────────────────
   // Object key of the generated agreement PDF in Supabase storage. Set when an
   // admin moves the application into SIGN_LOAN_AGREEMENT.
@@ -153,6 +159,28 @@ export class LoanApplication extends Model<LoanApplication> {
 
   @Column({ type: DataType.DATE, allowNull: true })
   declare document_request_token_expires_at: Date | null;
+
+  // ── Collect bank online-banking credentials ──────────────────────────────
+  // Secure single-link token + expiry issued by the "Collect Bank username and
+  // password" action. The applicant submits their online-banking login via this
+  // token (no account needed); a new request supersedes any earlier link.
+  @Column({ type: DataType.STRING, allowNull: true })
+  declare bank_credentials_token: string | null;
+
+  @Column({ type: DataType.DATE, allowNull: true })
+  declare bank_credentials_token_expires_at: Date | null;
+
+  // Online-banking login captured from the secure link. AES-256-GCM encrypted
+  // at rest (see common/encryption.util); decrypted only for the admin detail
+  // view. NOTE: storing raw banking credentials is high-risk — see the service.
+  @Column({ type: DataType.TEXT, allowNull: true })
+  declare bank_login_username_encrypted: string | null;
+
+  @Column({ type: DataType.TEXT, allowNull: true })
+  declare bank_login_password_encrypted: string | null;
+
+  @Column({ type: DataType.DATE, allowNull: true })
+  declare bank_credentials_submitted_at: Date | null;
 
   @HasMany(() => Document, {
     foreignKey: 'application_id',

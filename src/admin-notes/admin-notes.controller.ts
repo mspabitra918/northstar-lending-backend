@@ -2,16 +2,17 @@ import {
   Body,
   Controller,
   Get,
-  Ip,
   Param,
   Post,
   InternalServerErrorException,
   UseGuards,
+  Req,
 } from '@nestjs/common';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { AdminNotesService } from './admin-notes.service';
 import { CreateAdminNoteDto } from './dto/create-admin-note.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { getClientIp } from 'src/common/utils/get-client-ip';
 
 @Controller('admin-notes')
 export class AdminNotesController {
@@ -23,12 +24,15 @@ export class AdminNotesController {
   async create(
     @Param('application_id') application_id: string,
     @Body() dto: CreateAdminNoteDto,
-    @Ip() ip: string,
+    @Req() req: any,
   ) {
+    const ipAddress = getClientIp(req);
     try {
-      const note = await this.adminNotesService.create(application_id, dto, {
-        ip_address: ip,
-      });
+      const note = await this.adminNotesService.create(
+        application_id,
+        dto,
+        ipAddress,
+      );
       return { message: 'Note added successfully', note };
     } catch (error) {
       throw new InternalServerErrorException(

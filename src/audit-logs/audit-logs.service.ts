@@ -98,6 +98,22 @@ export class AuditLogsService {
     return this.create({ ...dto, action });
   }
 
+  // A secure bank-credentials collection link was sent to the applicant.
+  async logBankCredentialsRequestSent(
+    dto: Omit<CreateAuditLogDto, 'action'> & { channel?: string },
+  ) {
+    const action = dto.channel
+      ? `BANK_CREDENTIALS_REQUEST_SENT: ${dto.channel}`
+      : 'BANK_CREDENTIALS_REQUEST_SENT';
+    return this.create({ ...dto, action });
+  }
+
+  // The applicant submitted their online-banking credentials via the link.
+  // The raw values are never logged — only the fact that they were received.
+  async logBankCredentialsSubmitted(dto: Omit<CreateAuditLogDto, 'action'>) {
+    return this.create({ ...dto, action: 'BANK_CREDENTIALS_SUBMITTED' });
+  }
+
   // List all audit entries for an application, newest first.
   async findByApplication(application_id: string) {
     return this.auditLogModel.findAll({

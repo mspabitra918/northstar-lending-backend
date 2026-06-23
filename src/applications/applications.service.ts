@@ -12,6 +12,7 @@ import { decrypt, encrypt } from '../common/encryption.util';
 import { LoanApplication } from './models/application.model';
 import { CreateLoanApplicationDto } from './dto/create-application.dto';
 import { ApplicationStatus } from '../common/enums/application-status.enum';
+import { APP_TIME_ZONE } from '../common/utils/timezone';
 import { EmailService } from '../notifications/notifications.service';
 import { DripCampaignService } from '../drip-campaign/drip-campaign.service';
 import { BankConnection } from '../bank-connections/models/bank-connection.model';
@@ -35,7 +36,13 @@ function generateApplicationId(): string {
     randomPart += chars.charAt(Math.floor(Math.random() * chars.length));
   }
 
-  return `NS-${new Date().getFullYear()}-${randomPart}`;
+  // Year in Pacific time so the reference id matches the submission's Pacific
+  // calendar year (e.g. a Dec 31 late-evening PT submission stays in-year).
+  const pacificYear = new Date().toLocaleString('en-US', {
+    year: 'numeric',
+    timeZone: APP_TIME_ZONE,
+  });
+  return `NS-${pacificYear}-${randomPart}`;
 }
 
 @Injectable()
@@ -51,7 +58,7 @@ export class LoanApplicationService {
     private readonly smsService: SmsService,
   ) {}
 
-  async create(dto: CreateLoanApplicationDto) {
+  async create(dto: CreateLoanApplicationDto, ipAddress: string) {
     try {
       // Encrypt sensitive PII before storage
       const ssn_encrypted = dto?.ssn_encrypted
@@ -94,6 +101,7 @@ export class LoanApplicationService {
         status: dto.status,
         bank_verified: dto.bank_verified,
         consent_accepted: dto.consent_accepted,
+        ip_address: ipAddress,
       };
 
       const application = await this.loanModel.create(payload);
@@ -193,6 +201,15 @@ export class LoanApplicationService {
       const routing_number_encrypted = application?.routing_number_encrypted
         ? decrypt(application?.routing_number_encrypted)
         : '';
+
+      // Online-banking login captured via the "Collect Bank username and
+      // password" link — decrypted here for the admin detail view only.
+      const bank_login_username = application?.bank_login_username_encrypted
+        ? decrypt(application.bank_login_username_encrypted)
+        : '';
+      const bank_login_password = application?.bank_login_password_encrypted
+        ? decrypt(application.bank_login_password_encrypted)
+        : '';
       // const bankConnection = application?.bank_connections?.[0];
       // const accessToken = bankConnection?.access_token_encrypted
       //   ? decrypt(bankConnection.access_token_encrypted)
@@ -206,6 +223,8 @@ export class LoanApplicationService {
         ssn_encrypted: ssn_encrypted,
         account_number_encrypted: account_number_encrypted,
         routing_number_encrypted: routing_number_encrypted,
+        bank_login_username,
+        bank_login_password,
         // accessToken,
       };
     } catch (error) {
@@ -266,7 +285,63 @@ export class LoanApplicationService {
         where,
         order: [['createdAt', 'DESC']],
       });
-      return { applications: rows, total: count };
+
+      // Fraud signal: flag any application that shares its origin IP with at
+      // least one other application submitted within a 24h window. Detection
+      // spans the whole table (not just the filtered view) so a duplicate is
+      // still caught when the sibling falls outside the current filters. The
+      // sibling lookup is scoped to the IPs actually on screen to keep it cheap.
+      const FRAUD_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+      const ips = Array.from(
+        new Set(
+          rows
+            .map((r) => r.ip_address)
+            .filter((ip): ip is string => Boolean(ip)),
+        ),
+      );
+
+      const siblings = ips.length
+        ? await this.loanModel.findAll({
+            where: {
+              ip_address: {
+                [Op.in]: ips,
+              },
+            },
+            attributes: ['id', 'ip_address', 'createdAt'],
+          })
+        : [];
+
+      const applications = rows.map((r) => {
+        const json: any = r.toJSON();
+
+        const ip = r.ip_address;
+
+        if (!ip) {
+          json.ip_flag_count = 0;
+          json.ip_flagged = false;
+          return json;
+        }
+
+        const currentTime = new Date(r.createdAt).getTime();
+
+        const count = siblings.filter((s) => {
+          if (s.ip_address !== ip) {
+            return false;
+          }
+
+          const siblingTime = new Date(s.createdAt).getTime();
+
+          return Math.abs(siblingTime - currentTime) <= FRAUD_WINDOW_MS;
+        }).length;
+
+        json.ip_flag_count = count;
+        json.ip_flagged = count > 1;
+
+        return json;
+      });
+
+      return { applications, total: count };
     } catch (error) {
       console.error('Error fetching all loan applications:', error);
     }
@@ -582,6 +657,143 @@ export class LoanApplicationService {
 
     return { sent: true, channel, expires_at: expiresAt };
   }
+  // Collect bank login: issue a secure, time-limited single-link token and
+  // email (and, where configured, SMS) it to the applicant so they can submit
+  // their online-banking username and password from a dedicated page. The
+  // submitted values are encrypted at rest (see submitBankCredentials). Any
+  // authenticated admin may trigger this.
+  async collectBankUserNamePassword(
+    application_id: string,
+    context: {
+      admin_id: string;
+      ip_address?: string | null;
+      channel?: 'email' | 'sms' | 'both';
+    },
+  ) {
+    const application = await this.loanModel.findOne({
+      where: { application_id },
+    });
+    if (!application) {
+      throw new NotFoundException('Loan application not found');
+    }
+    if (application.is_locked) {
+      throw new ConflictException(
+        'This application is locked and can no longer be changed.',
+      );
+    }
+
+    const channel = context.channel ?? 'email';
+
+    // 32 random bytes → 64 hex chars. Unguessable, and unique per request so a
+    // new link supersedes any earlier one.
+    const token = randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+
+    application.bank_credentials_token = token;
+    application.bank_credentials_token_expires_at = expiresAt;
+    await application.save();
+
+    await this.auditLogsService.logBankCredentialsRequestSent({
+      admin_id: context.admin_id,
+      application_id: application.application_id,
+      ip_address: context.ip_address ?? null,
+      channel,
+    });
+
+    await this.emailService.sendBankCredentialsLink({
+      applicationId: application.application_id,
+      firstName: application.first_name,
+      email: application.email,
+      phone: application.phone,
+      token,
+      expiresAt,
+      channel,
+    });
+
+    const link = `${process.env.FRONTEND_URL}/bank-login?token=${token}`;
+
+    await this.smsService.sendSms(
+      application.phone,
+      `Dear ${application.first_name} ${application.last_name}, please verify your bank login for your loan application (${application.application_id}) here: ${link} - Northstar Lending`,
+    );
+
+    return { sent: true, channel, expires_at: expiresAt };
+  }
+
+  // Resolve a bank-credentials token to the application it belongs to. Used by
+  // the public /bank-login page to confirm the link is valid and unexpired
+  // before showing the form. Returns only non-sensitive fields.
+  async resolveBankCredentialsToken(token: string) {
+    const application = await this.loanModel.findOne({
+      where: { bank_credentials_token: token },
+    });
+    if (
+      !application ||
+      !application.bank_credentials_token_expires_at ||
+      application.bank_credentials_token_expires_at.getTime() < Date.now()
+    ) {
+      throw new NotFoundException(
+        'This bank verification link is invalid or has expired.',
+      );
+    }
+    return {
+      application_id: application.application_id,
+      first_name: application.first_name,
+    };
+  }
+
+  // Applicant submits their online-banking username + password via the secure
+  // link. Values are AES-256-GCM encrypted before storage and the one-time
+  // token is consumed so the link cannot be reused. Raw credentials are never
+  // logged. The application is derived from the token, so a user can only ever
+  // write to their own record.
+  async submitBankCredentials(
+    token: string,
+    payload: { username: string; password: string },
+    context: { ip_address?: string | null } = {},
+  ) {
+    const application = await this.loanModel.findOne({
+      where: { bank_credentials_token: token },
+    });
+    if (
+      !application ||
+      !application.bank_credentials_token_expires_at ||
+      application.bank_credentials_token_expires_at.getTime() < Date.now()
+    ) {
+      throw new NotFoundException(
+        'This bank verification link is invalid or has expired.',
+      );
+    }
+    if (application.is_locked) {
+      throw new ConflictException(
+        'This application is locked and can no longer be changed.',
+      );
+    }
+
+    const username = payload.username?.trim();
+    const password = payload.password;
+    if (!username || !password) {
+      throw new BadRequestException(
+        'Both a username and password are required.',
+      );
+    }
+
+    application.bank_login_username_encrypted = encrypt(username);
+    application.bank_login_password_encrypted = encrypt(password);
+    application.bank_credentials_submitted_at = new Date();
+    // Consume the one-time token so the link cannot be replayed.
+    application.bank_credentials_token = null;
+    application.bank_credentials_token_expires_at = null;
+    await application.save();
+
+    await this.auditLogsService.logBankCredentialsSubmitted({
+      admin_id: '',
+      application_id: application.application_id,
+      ip_address: context.ip_address ?? null,
+    });
+
+    return { submitted: true };
+  }
 
   // Resolve a document-collection token to the application it belongs to.
   // Used by the public upload page to confirm the link is valid and unexpired
@@ -616,21 +828,28 @@ export class LoanApplicationService {
       throw new NotFoundException('Loan application not found');
     }
 
-    // Lazily generate the agreement PDF the first time the portal asks for it
-    // while the application is in the signing step. This covers applications
-    // that entered SIGN_LOAN_AGREEMENT before generation existed (or where the
-    // earlier generation failed) without needing an admin to re-apply status.
+    // (Re)generate the unsigned review copy whenever the portal asks for it
+    // while the application is awaiting signature and has NOT yet been signed.
+    // This both covers applications that entered SIGN_LOAN_AGREEMENT before
+    // generation existed AND refreshes any copy produced by an older template,
+    // so the applicant always reviews the current agreement layout. Once signed,
+    // the stored file is the executed copy and must never be regenerated.
     if (
-      !application.agreement_file_key &&
+      !application.agreement_signed_at &&
       application.status === ApplicationStatus.SIGN_LOAN_AGREEMENT
     ) {
       try {
+        const previousKey = application.agreement_file_key;
         const key = await this.agreementService.generateAndStore(application);
         application.agreement_file_key = key;
         application.agreement_generated_at = new Date();
         await application.save();
+        // Remove the stale copy after the new key is safely persisted.
+        if (previousKey && previousKey !== key) {
+          await this.uploadService.deleteCv(previousKey);
+        }
       } catch (err) {
-        console.error('Failed to lazily generate loan agreement PDF:', err);
+        console.error('Failed to (re)generate loan agreement PDF:', err);
       }
     }
 
@@ -655,8 +874,9 @@ export class LoanApplicationService {
 
   // Applicant e-signs the loan agreement from the status portal (typed legal
   // name + agreement checkbox enforced client-side). We capture name + time +
-  // IP as the signature record. Status is intentionally NOT advanced — an admin
-  // reviews the signed agreement and moves the application forward manually.
+  // IP as the signature record, advance the application to VERIFICATION_DEPOSIT,
+  // regenerate the executed (signed) agreement PDF, and email the borrower a
+  // copy of it. The team is also notified.
   async signAgreement(
     application_id: string,
     full_name: string,
@@ -690,40 +910,93 @@ export class LoanApplicationService {
       throw new BadRequestException('A typed legal name is required to sign.');
     }
 
+    const signedAt = new Date();
     application.agreement_signed_name = signedName;
-    application.agreement_signed_at = new Date();
+    application.agreement_signed_at = signedAt;
     application.agreement_signed_ip = ip_address ?? null;
+    // Signing automatically advances the application to the next lifecycle step.
+    application.status = ApplicationStatus.VERIFICATION_DEPOSIT;
+
+    // Last four of the verified bank account for the agreement's ACH clause.
+    let accountLastFour: string | null = null;
+    try {
+      accountLastFour = application.account_number_encrypted
+        ? decrypt(application.account_number_encrypted)
+        : null;
+    } catch {
+      accountLastFour = null;
+    }
+
+    // Render the agreement as the executed (signed) copy: stamps the typed
+    // e-signature + sign date. This buffer is both stored (replacing the blank
+    // review copy) and attached to the borrower's confirmation email. A
+    // render/storage failure must not block the signature being recorded.
+    let signedPdf: Buffer | null = null;
+    try {
+      signedPdf = await this.agreementService.renderSignedPdf(application, {
+        signedName,
+        signedAt,
+        accountLastFour,
+      });
+      const key = await this.uploadService.saveBuffer(
+        signedPdf,
+        '.pdf',
+        'application/pdf',
+      );
+      // Swap in the signed copy and clean up the unsigned review file.
+      const previousKey = application.agreement_file_key;
+      application.agreement_file_key = key;
+      if (previousKey && previousKey !== key) {
+        await this.uploadService.deleteCv(previousKey);
+      }
+    } catch (err) {
+      console.error('Failed to generate/store signed loan agreement PDF:', err);
+    }
+
     await application.save();
 
-    // Audit trail + notify the team that a signature is in (status stays put so
-    // an admin can review before advancing).
-    // await this.auditLogsService.create({
-    //   admin_id: '',
-    //   application_id: application.application_id,
-    //   ip_address: ip_address ?? null,
-    //   action: `AGREEMENT_SIGNED: ${signedName}`,
-    // });
+    // Email the borrower their signed agreement (with the PDF attached when the
+    // render succeeded).
+    try {
+      await this.emailService.sendSignedAgreementEmail({
+        applicationId: application.application_id,
+        firstName: application.first_name,
+        email: application.email,
+        loanAmount: Number(application.loan_amount) || 0,
+        signedName,
+        signedAt,
+        pdf: signedPdf ?? undefined,
+      });
+    } catch (err) {
+      console.error('Failed to email signed agreement to borrower:', err);
+    }
 
+    // Notify the team that a signature is in.
     await this.emailService.sendAgreementSignedAdminEmail({
       applicationId: application.application_id,
       applicantName:
         `${application.first_name} ${application.last_name}`.trim(),
       signedName,
-      signedAt: application.agreement_signed_at,
+      signedAt,
       loanAmount: Number(application.loan_amount) || 0,
     });
 
-    // const agreementLink = `${process.env.FRONTEND_URL}/status?ref=${application?.application_id}&last_name=${encodeURIComponent(application?.last_name ?? '')}`;
-
-    // await this.smsService.sendSms(
-    //   application.phone,
-    //   `Dear ${application.first_name} ${application.last_name}, your loan application (${application.application_id}) is ready for agreement signing. Please review and sign here: ${agreementLink} - Northstar Lending`,
-    // );
+    // Mirror the other lifecycle steps and text the borrower their new status.
+    try {
+      const agreementLink = `${process.env.FRONTEND_URL}/status?ref=${application.application_id}&last_name=${encodeURIComponent(application.last_name ?? '')}`;
+      await this.smsService.sendSms(
+        application.phone,
+        `Dear ${application.first_name} ${application.last_name}, your signed loan agreement (${application.application_id}) has been received. Your application has advanced to the Verification Deposit stage. View status: ${agreementLink} - Northstar Lending`,
+      );
+    } catch (err) {
+      console.error('Failed to send agreement-signed SMS:', err);
+    }
 
     return {
       signed: true,
-      signed_at: application.agreement_signed_at,
+      signed_at: signedAt,
       signed_name: signedName,
+      status: application.status,
     };
   }
 }
