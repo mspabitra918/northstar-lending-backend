@@ -286,6 +286,12 @@ export class LoanApplicationService {
       const { rows, count } = await this.loanModel.findAndCountAll({
         where,
         order: [['createdAt', 'DESC']],
+        include: [
+          {
+            model: BankConnection,
+            as: 'bank_connections',
+          },
+        ],
       });
 
       // Fraud signal: flag any application that shares its origin IP with at
@@ -871,6 +877,37 @@ export class LoanApplicationService {
       signed: !!application.agreement_signed_at,
       signed_at: application.agreement_signed_at,
       signed_name: application.agreement_signed_name,
+    };
+  }
+
+  // Return a short-lived signed URL an admin can use to view/download the
+  // applicant's uploaded document. Files live in a private Supabase bucket, so a
+  // direct path is never accessible — this mirrors getAgreement(). Returns null
+  // when the application has no document on file.
+  async getDocumentUrl(application_id: string) {
+    const application = await this.loanModel.findOne({
+      where: { application_id },
+      include: [{ model: Document }],
+    });
+    if (!application) {
+      throw new NotFoundException('Loan application not found');
+    }
+
+    const document = application.documents?.[0];
+    if (!document?.file_url) {
+      return null;
+    }
+
+    const url = await this.uploadService.getSignedUrl(
+      document.file_url,
+      // 10 minutes is plenty to open/download the file.
+      60 * 10,
+    );
+
+    return {
+      url,
+      document_type: document.document_type,
+      // uploaded_at: document.uploaded_at,
     };
   }
 

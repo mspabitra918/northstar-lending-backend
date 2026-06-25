@@ -5,7 +5,6 @@ import {
   Get,
   HttpCode,
   InternalServerErrorException,
-  Ip,
   Param,
   Patch,
   Post,
@@ -268,6 +267,23 @@ export class LoanApplicationController {
     } catch (error) {
       throw new InternalServerErrorException(
         'Error fetching loan agreement',
+        error instanceof Error ? error.message : undefined,
+      );
+    }
+  }
+
+  // Admin — fetch a short-lived signed URL to view the applicant's uploaded
+  // document. The file lives in a private bucket, so this is the only way to
+  // open it. Returns { document: null } when nothing has been uploaded.
+  @Get('applications/:application_id/document')
+  @UseGuards(RolesGuard)
+  async getDocument(@Param('application_id') application_id: string) {
+    try {
+      const document = await this.loanService.getDocumentUrl(application_id);
+      return { document };
+    } catch (error) {
+      throw new InternalServerErrorException(
+        'Error fetching document',
         error instanceof Error ? error.message : undefined,
       );
     }

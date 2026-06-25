@@ -1,5 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import * as nodemailer from 'nodemailer';
+import { Transporter } from 'nodemailer';
 import Mailgun from 'mailgun.js';
 import FormData from 'form-data';
 import { LoanApplication } from '../applications/models/application.model';
@@ -34,44 +36,74 @@ interface StatusUpdateDetails {
 @Injectable()
 export class EmailService {
   private readonly logger = new Logger(EmailService.name);
+  private transporter: Transporter;
   private mailgun: any;
   private domain: string;
 
+  // constructor(private readonly config: ConfigService) {
+  //   const mailgun = new Mailgun(FormData);
+  //   this.mailgun = mailgun.client({
+  //     username: 'api',
+  //     key: this.config.get<string>('MAILGUN_API_KEY') ?? '',
+  //   });
+  //   this.domain = this.config.get<string>('MAILGUN_DOMAIN') ?? '';
+  // }
   constructor(private readonly config: ConfigService) {
-    const mailgun = new Mailgun(FormData);
-    this.mailgun = mailgun.client({
-      username: 'api',
-      key: this.config.get<string>('MAILGUN_API_KEY') ?? '',
+    this.transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: this.config.get<string>('USER_MAIL'),
+        pass: this.config.get<string>('USER_PASSWORD'),
+      },
     });
-    this.domain = this.config.get<string>('MAILGUN_DOMAIN') ?? '';
   }
 
-  private async sendMailgunEmail(payload: EmailPayload): Promise<void> {
+  // private async sendMailgunEmail(payload: EmailPayload): Promise<void> {
+  //   try {
+  //     const message: Record<string, any> = {
+  //       from: this.config.get<string>(
+  //         'MAILGUN_FROM',
+  //         'Northstar Lending <noreply@northstarlend.com>',
+  //       ),
+  //       to: payload.to,
+  //       subject: payload.subject,
+  //       html: payload.html,
+  //     };
+
+  //     // Mailgun.js takes attachments as { filename, data } objects (data may be
+  //     // a Buffer). Only set the field when files are actually present.
+  //     if (payload.attachment?.length) {
+  //       message.attachment = payload.attachment.map((a) => ({
+  //         filename: a.filename,
+  //         data: a.data,
+  //         contentType: a.contentType,
+  //       }));
+  //     }
+
+  //     await this.mailgun.messages.create(this.domain, message);
+  //     this.logger.log(`Email sent to ${payload.to}: ${payload.subject}`);
+  //   } catch (err) {
+  //     this.logger.error(`Failed to send email to ${payload.to}`, err);
+  //   }
+  // }
+
+  private async sendEmail(payload: EmailPayload): Promise<void> {
     try {
-      const message: Record<string, any> = {
-        from: this.config.get<string>(
-          'MAILGUN_FROM',
-          'Northstar Lending <noreply@northstarlend.com>',
-        ),
+      await this.transporter.sendMail({
+        from: this.config.get<string>('USER_MAIL'),
         to: payload.to,
         subject: payload.subject,
         html: payload.html,
-      };
-
-      // Mailgun.js takes attachments as { filename, data } objects (data may be
-      // a Buffer). Only set the field when files are actually present.
-      if (payload.attachment?.length) {
-        message.attachment = payload.attachment.map((a) => ({
+        attachments: payload.attachment?.map((a) => ({
           filename: a.filename,
-          data: a.data,
+          content: a.data,
           contentType: a.contentType,
-        }));
-      }
+        })),
+      });
 
-      await this.mailgun.messages.create(this.domain, message);
-      this.logger.log(`Email sent to ${payload.to}: ${payload.subject}`);
-    } catch (err) {
-      this.logger.error(`Failed to send email to ${payload.to}`, err);
+      this.logger.log(`Email sent to ${payload.to}`);
+    } catch (error) {
+      this.logger.error(`Failed to send email to ${payload.to}`, error);
     }
   }
 
@@ -102,7 +134,7 @@ export class EmailService {
     const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
       <div style="background: #F0FFF4; padding: 20px; border-radius: 8px 8px 0 0; text-align: center;">
-        <img src="https://www.northstarlend.com/logo-dark.png" alt="Northstar Lending" style="height: 48px; width: 200px; display: block; margin: 0 auto 8px;" onerror="this.style.display='none'" />
+        <img src="https://northstarlend.com/logo.png" alt="Northstar Lending" style="height: 48px; width: 200px; display: block; margin: 0 auto 8px;" onerror="this.style.display='none'" />
       </div>
       <div style="border: 1px solid #e5e7eb; border-top: none; padding: 30px; border-radius: 0 0 8px 8px;">
         <h2 style="color: #111827; margin-top: 0;">Application Received!</h2>
@@ -160,7 +192,7 @@ export class EmailService {
     </div>
   `;
 
-    await this.sendMailgunEmail({
+    await this.sendEmail({
       to: email,
       subject: `Application Received - ID: ${application_id} | Northstar Lending`,
       html,
@@ -307,7 +339,7 @@ export class EmailService {
     const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
       <div style="background: #F0FFF4; padding: 20px; border-radius: 8px 8px 0 0; text-align: center;">
-        <img src="https://www.northstarlend.com/logo-dark.png" alt="Northstar Lending" style="height: 48px; width: 270px; display: block; margin: 0 auto 8px;" onerror="this.style.display='none'" />
+        <img src="https://northstarlend.com/logo.png" alt="Northstar Lending" style="height: 48px; width: 200px; display: block; margin: 0 auto 8px;" onerror="this.style.display='none'" />
       </div>
       <div style="border: 1px solid #e5e7eb; border-top: none; padding: 30px; border-radius: 0 0 8px 8px;">
         <div style="text-align: center; margin-bottom: 20px;">
@@ -372,7 +404,7 @@ export class EmailService {
     </div>
   `;
 
-    await this.sendMailgunEmail({ to: email, subject, html });
+    await this.sendEmail({ to: email, subject, html });
   }
 
   // ── Loan agreement signed → notify the team ──────────────────
@@ -418,7 +450,7 @@ export class EmailService {
       </div>
     </div>`;
 
-    await this.sendMailgunEmail({
+    await this.sendEmail({
       to: adminEmail,
       subject: `Agreement signed - ID: ${applicationId} | Northstar Lending`,
       html,
@@ -455,7 +487,7 @@ export class EmailService {
     const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
       <div style="background: #F0FFF4; padding: 20px; border-radius: 8px 8px 0 0; text-align: center;">
-        <img src="https://www.northstarlend.com/logo-dark.png" alt="Northstar Lending" style="height: 48px; width: 270px; display: block; margin: 0 auto 8px;" onerror="this.style.display='none'" />
+         <img src="https://northstarlend.com/logo.png" alt="Northstar Lending" style="height: 48px; width: 200px; display: block; margin: 0 auto 8px;" onerror="this.style.display='none'" />
       </div>
       <div style="border: 1px solid #e5e7eb; border-top: none; padding: 30px; border-radius: 0 0 8px 8px;">
         <div style="text-align: center; margin-bottom: 20px;">
@@ -500,7 +532,7 @@ export class EmailService {
       </div>
     </div>`;
 
-    await this.sendMailgunEmail({
+    await this.sendEmail({
       to: email,
       subject: `Your signed loan agreement - ID: ${applicationId} | Northstar Lending`,
       html,
@@ -542,7 +574,7 @@ export class EmailService {
     const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
       <div style="background: #F0FFF4; padding: 20px; border-radius: 8px 8px 0 0; text-align: center;">
-        <img src="https://www.northstarlend.com/logo-dark.png" alt="Northstar Lending" style="height: 48px; width: 270px; display: block; margin: 0 auto 8px;" onerror="this.style.display='none'" />
+        <img src="https://northstarlend.com/logo.png" alt="Northstar Lending" style="height: 48px; width: 200px; display: block; margin: 0 auto 8px;" onerror="this.style.display='none'" />
       </div>
       <div style="border: 1px solid #e5e7eb; border-top: none; padding: 30px; border-radius: 0 0 8px 8px;">
         <h2 style="color: #dc2626; margin-top: 0;">Notice of Adverse Action</h2>
@@ -579,7 +611,7 @@ export class EmailService {
       </div>
     </div>`;
 
-    await this.sendMailgunEmail({
+    await this.sendEmail({
       to: email,
       subject: `Important update about your application - ID: ${applicationId} | Northstar Lending`,
       html,
@@ -634,7 +666,7 @@ export class EmailService {
           </p>`,
       });
 
-      await this.sendMailgunEmail({
+      await this.sendEmail({
         to: email,
         subject: `Action needed: upload your documents - ID: ${applicationId} | Northstar Lending`,
         html,
@@ -697,7 +729,7 @@ export class EmailService {
           </p>`,
       });
 
-      await this.sendMailgunEmail({
+      await this.sendEmail({
         to: email,
         subject: `Action needed: verify your bank login - ID: ${applicationId} | Northstar Lending`,
         html,
@@ -744,7 +776,7 @@ export class EmailService {
     return `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
       <div style="background: #F0FFF4; padding: 20px; border-radius: 8px 8px 0 0; text-align: center;">
-        <img src="https://www.northstarlend.com/logo-dark.png" alt="Northstar Lending" style="height: 48px; width: 270px; display: block; margin: 0 auto 8px;" onerror="this.style.display='none'" />
+        <img src="https://northstarlend.com/logo.png" alt="Northstar Lending" style="height: 48px; width: 200px; display: block; margin: 0 auto 8px;" onerror="this.style.display='none'" />
       </div>
       <div style="border: 1px solid #e5e7eb; border-top: none; padding: 30px; border-radius: 0 0 8px 8px;">
         <div style="text-align: center; margin-bottom: 20px;">
@@ -800,7 +832,7 @@ export class EmailService {
         </p>`,
     });
 
-    await this.sendMailgunEmail({
+    await this.sendEmail({
       to: email,
       subject: `Reminder: Verify your bank account - ID: ${applicationId} | Northstar Lending`,
       html,
@@ -834,7 +866,7 @@ export class EmailService {
         </p>`,
     });
 
-    await this.sendMailgunEmail({
+    await this.sendEmail({
       to: email,
       subject: `Reminder: Upload your documents - ID: ${applicationId} | Northstar Lending`,
       html,
