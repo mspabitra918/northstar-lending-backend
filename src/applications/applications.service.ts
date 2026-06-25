@@ -106,24 +106,48 @@ export class LoanApplicationService {
 
       const application = await this.loanModel.create(payload);
 
-      await this.emailService.sendApplicationConfirmationEmail(application);
-
-      const verifyBankLink = `${process.env.FRONTEND_URL}/verify-bank?id=${application.id}&ref=${application.application_id}&name=${application.last_name}`;
-
-      await this.smsService.sendSms(
-        application.phone,
-        `Dear ${application.first_name} ${application.last_name}, your loan application (${application.application_id}) has been submitted successfully. Please verify your bank account to continue: ${verifyBankLink} - Northstar Lending`,
-      );
-
-      // Kick off the automated 5-day drip (one reminder every 24h) until the
-      // applicant completes bank verification + document upload.
-      await this.dripCampaignService.startCampaign(application.id);
+      // Everything below is a post-submission side effect (email, SMS, drip
+      // scheduling). None of it should block — or be able to fail — the HTTP
+      // response: the application is already persisted. Running these inline
+      // previously meant a slow/unreachable dependency (e.g. the BullMQ/Redis
+      // queue in startCampaign, or a stalled Twilio/SMTP call) held the request
+      // open until the gateway returned 504, even though the record and email
+      // had already succeeded. Fire-and-forget keeps the response fast and
+      // resilient; each task logs its own failure instead of bubbling up.
+      this.dispatchPostCreateNotifications(application);
 
       return application;
     } catch (error) {
       console.error('Error creating loan application:', error);
       throw error;
     }
+  }
+
+  // Fire-and-forget the post-submission notifications. Deliberately NOT awaited
+  // by create() so the response returns as soon as the row is written. Each
+  // task is isolated: a failure (or a hang in one dependency) is logged and
+  // cannot affect the others or the already-sent HTTP response.
+  private dispatchPostCreateNotifications(application: LoanApplication): void {
+    void this.emailService
+      .sendApplicationConfirmationEmail(application)
+      .catch((err) =>
+        console.error('Failed to send application confirmation email:', err),
+      );
+
+    const verifyBankLink = `${process.env.FRONTEND_URL}/verify-bank?id=${application.id}&ref=${application.application_id}&name=${application.last_name}`;
+
+    void this.smsService
+      .sendSms(
+        application.phone,
+        `Dear ${application.first_name} ${application.last_name}, your loan application (${application.application_id}) has been submitted successfully. Please verify your bank account to continue: ${verifyBankLink} - Northstar Lending`,
+      )
+      .catch((err) => console.error('Failed to send submission SMS:', err));
+
+    // Kick off the automated 5-day drip (one reminder every 24h) until the
+    // applicant completes bank verification + document upload.
+    void this.dripCampaignService
+      .startCampaign(application.id)
+      .catch((err) => console.error('Failed to start drip campaign:', err));
   }
 
   async getByIdUser(application_id: string) {
