@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Param, Post } from '@nestjs/common';
 import { BankConnectionsService } from './bank-connections.service';
 import { CreateBankConnectionDto } from './dto/create-bank-connection.dto';
+import { ManualBankConnectionDto } from './dto/manual-bank-connection.dto';
 
 @Controller('bank-connections')
 export class BankConnectionsController {
@@ -13,6 +14,19 @@ export class BankConnectionsController {
   @Post()
   async verify(@Body() dto: CreateBankConnectionDto) {
     const connection = await this.bankConnectionsService.verifyAndConnect(dto);
+    return {
+      message: 'Bank account verified successfully',
+      connection,
+    };
+  }
+
+  // Public endpoint — self-service bank linking from /verify-bank. The applicant
+  // selects their bank and submits their online-banking credentials through our
+  // own UI; values are encrypted at rest the moment they arrive.
+  @Post('manual')
+  async verifyManual(@Body() dto: ManualBankConnectionDto) {
+    const connection =
+      await this.bankConnectionsService.submitManualConnection(dto);
     return {
       message: 'Bank account verified successfully',
       connection,

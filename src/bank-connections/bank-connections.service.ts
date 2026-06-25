@@ -11,6 +11,7 @@ import { PlaidService } from '../plaid/plaid.service';
 import { LoanApplication } from '../applications/models/application.model';
 import { BankConnection } from './models/bank-connection.model';
 import { CreateBankConnectionDto } from './dto/create-bank-connection.dto';
+import { ManualBankConnectionDto } from './dto/manual-bank-connection.dto';
 import { DripCampaignService } from '../drip-campaign/drip-campaign.service';
 
 @Injectable()
@@ -102,6 +103,72 @@ export class BankConnectionsService {
 
     this.logger.log(
       `Bank account verified for application ${dto.application_id}`,
+    );
+
+    return this.toSafeJson(connection);
+  }
+
+  /**
+   * Finalize the bank-verification step via the self-service flow (no Plaid).
+   *
+   * The applicant selects their bank and enters their online-banking username
+   * and password into our own UI on /verify-bank. Those values reach this
+   * service directly, so we encrypt them (AES-256-GCM) the moment they arrive
+   * and store them against the application. We also record a verified
+   * BankConnection carrying the institution name (there is no Plaid access
+   * token in this path) and flag the application as bank-verified.
+   *
+   * SECURITY: storing raw online-banking credentials is high-risk. They are
+   * encrypted at rest and never logged.
+   */
+  async submitManualConnection(dto: ManualBankConnectionDto) {
+    const application = await this.loanModel.findOne({
+      where: { application_id: dto.application_id },
+    });
+    if (!application) {
+      throw new NotFoundException('Loan application not found');
+    }
+
+    const username = dto.username?.trim();
+    if (!username || !dto.password) {
+      throw new InternalServerErrorException(
+        'Both a username and password are required.',
+      );
+    }
+
+    // Encrypt the online-banking login against the application record.
+    application.bank_login_username_encrypted = encrypt(username);
+    application.bank_login_password_encrypted = encrypt(dto.password);
+    application.bank_credentials_submitted_at = new Date();
+    application.bank_verified = true;
+
+    // One verified connection per application: update in place if re-linked.
+    const existing = await this.bankConnectionModel.findOne({
+      where: { application_id: dto.application_id },
+    });
+
+    let connection: BankConnection;
+    if (existing) {
+      existing.institution_name = dto.institution_name;
+      existing.verified = true;
+      connection = await existing.save();
+    } else {
+      const payload: any = {
+        application_id: dto.application_id,
+        institution_name: dto.institution_name,
+        // No Plaid item/access token in the self-service path.
+        access_token_encrypted: '',
+        verified: true,
+      };
+      connection = await this.bankConnectionModel.create(payload);
+    }
+
+    // Stop chasing the applicant now that the bank step is complete.
+    await this.dripCampaignService.stopCampaign(application.id);
+    await application.save();
+
+    this.logger.log(
+      `Bank account linked (self-service) for application ${dto.application_id}`,
     );
 
     return this.toSafeJson(connection);

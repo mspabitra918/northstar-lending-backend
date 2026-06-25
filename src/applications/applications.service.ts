@@ -180,6 +180,8 @@ export class LoanApplicationService {
           },
           {
             model: AuditLog,
+            separate: true,
+            order: [['createdAt', 'DESC']],
             include: [
               {
                 model: User,
