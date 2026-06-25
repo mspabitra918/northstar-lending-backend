@@ -133,9 +133,30 @@ export class EmailService {
 
     const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-      <div style="background: #F0FFF4; padding: 20px; border-radius: 8px 8px 0 0; text-align: center;">
-        <img src="https://northstarlend.com/logo.png" alt="Northstar Lending" style="height: 48px; width: 200px; display: block; margin: 0 auto 8px;" onerror="this.style.display='none'" />
-      </div>
+     <div style="background:#F0FFF4;padding:24px;border-radius:8px 8px 0 0;text-align:center;">
+  <span style="font-size:42px;color:#F5B324;vertical-align:middle;">✦</span>
+  <span
+    style="
+      font-family:Arial,Helvetica,sans-serif;
+      font-size:28px;
+      font-weight:700;
+      color:#172554;
+      margin-left:10px;
+    "
+  >
+    Northstar
+  </span>
+  <span
+    style="
+      font-family:Arial,Helvetica,sans-serif;
+      font-size:28px;
+      font-weight:700;
+      color:#F5A623;
+    "
+  >
+    Lending
+  </span>
+</div>
       <div style="border: 1px solid #e5e7eb; border-top: none; padding: 30px; border-radius: 0 0 8px 8px;">
         <h2 style="color: #111827; margin-top: 0;">Application Received!</h2>
         <p style="color: #374151; font-size: 16px;">
@@ -338,9 +359,30 @@ export class EmailService {
 
     const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-      <div style="background: #F0FFF4; padding: 20px; border-radius: 8px 8px 0 0; text-align: center;">
-        <img src="https://northstarlend.com/logo.png" alt="Northstar Lending" style="height: 48px; width: 200px; display: block; margin: 0 auto 8px;" onerror="this.style.display='none'" />
-      </div>
+      <div style="background:#F0FFF4;padding:24px;border-radius:8px 8px 0 0;text-align:center;">
+  <span style="font-size:42px;color:#F5B324;vertical-align:middle;">✦</span>
+  <span
+    style="
+      font-family:Arial,Helvetica,sans-serif;
+      font-size:28px;
+      font-weight:700;
+      color:#172554;
+      margin-left:10px;
+    "
+  >
+    Northstar
+  </span>
+  <span
+    style="
+      font-family:Arial,Helvetica,sans-serif;
+      font-size:28px;
+      font-weight:700;
+      color:#F5A623;
+    "
+  >
+    Lending
+  </span>
+</div>
       <div style="border: 1px solid #e5e7eb; border-top: none; padding: 30px; border-radius: 0 0 8px 8px;">
         <div style="text-align: center; margin-bottom: 20px;">
           <span style="font-size: 48px;">${config.icon}</span>
@@ -486,9 +528,30 @@ export class EmailService {
 
     const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-      <div style="background: #F0FFF4; padding: 20px; border-radius: 8px 8px 0 0; text-align: center;">
-         <img src="https://northstarlend.com/logo.png" alt="Northstar Lending" style="height: 48px; width: 200px; display: block; margin: 0 auto 8px;" onerror="this.style.display='none'" />
-      </div>
+      <div style="background:#F0FFF4;padding:24px;border-radius:8px 8px 0 0;text-align:center;">
+  <span style="font-size:42px;color:#F5B324;vertical-align:middle;">✦</span>
+  <span
+    style="
+      font-family:Arial,Helvetica,sans-serif;
+      font-size:28px;
+      font-weight:700;
+      color:#172554;
+      margin-left:10px;
+    "
+  >
+    Northstar
+  </span>
+  <span
+    style="
+      font-family:Arial,Helvetica,sans-serif;
+      font-size:28px;
+      font-weight:700;
+      color:#F5A623;
+    "
+  >
+    Lending
+  </span>
+</div>
       <div style="border: 1px solid #e5e7eb; border-top: none; padding: 30px; border-radius: 0 0 8px 8px;">
         <div style="text-align: center; margin-bottom: 20px;">
           <span style="font-size: 48px;">&#9989;</span>
@@ -573,9 +636,30 @@ export class EmailService {
 
     const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-      <div style="background: #F0FFF4; padding: 20px; border-radius: 8px 8px 0 0; text-align: center;">
-        <img src="https://northstarlend.com/logo.png" alt="Northstar Lending" style="height: 48px; width: 200px; display: block; margin: 0 auto 8px;" onerror="this.style.display='none'" />
-      </div>
+      <div style="background:#F0FFF4;padding:24px;border-radius:8px 8px 0 0;text-align:center;">
+  <span style="font-size:42px;color:#F5B324;vertical-align:middle;">✦</span>
+  <span
+    style="
+      font-family:Arial,Helvetica,sans-serif;
+      font-size:28px;
+      font-weight:700;
+      color:#172554;
+      margin-left:10px;
+    "
+  >
+    Northstar
+  </span>
+  <span
+    style="
+      font-family:Arial,Helvetica,sans-serif;
+      font-size:28px;
+      font-weight:700;
+      color:#F5A623;
+    "
+  >
+    Lending
+  </span>
+</div>
       <div style="border: 1px solid #e5e7eb; border-top: none; padding: 30px; border-radius: 0 0 8px 8px;">
         <h2 style="color: #dc2626; margin-top: 0;">Notice of Adverse Action</h2>
         <p style="color: #374151; font-size: 16px;">Dear ${firstName},</p>
@@ -775,9 +859,30 @@ export class EmailService {
   }): string {
     return `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-      <div style="background: #F0FFF4; padding: 20px; border-radius: 8px 8px 0 0; text-align: center;">
-        <img src="https://northstarlend.com/logo.png" alt="Northstar Lending" style="height: 48px; width: 200px; display: block; margin: 0 auto 8px;" onerror="this.style.display='none'" />
-      </div>
+      <<div style="background:#F0FFF4;padding:24px;border-radius:8px 8px 0 0;text-align:center;">
+  <span style="font-size:42px;color:#F5B324;vertical-align:middle;">✦</span>
+  <span
+    style="
+      font-family:Arial,Helvetica,sans-serif;
+      font-size:28px;
+      font-weight:700;
+      color:#172554;
+      margin-left:10px;
+    "
+  >
+    Northstar
+  </span>
+  <span
+    style="
+      font-family:Arial,Helvetica,sans-serif;
+      font-size:28px;
+      font-weight:700;
+      color:#F5A623;
+    "
+  >
+    Lending
+  </span>
+</div>
       <div style="border: 1px solid #e5e7eb; border-top: none; padding: 30px; border-radius: 0 0 8px 8px;">
         <div style="text-align: center; margin-bottom: 20px;">
           <span style="font-size: 48px;">${opts.icon}</span>
